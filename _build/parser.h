@@ -1,4 +1,4 @@
-/* A Bison parser, made by GNU Bison 3.6.4.  */
+/* A Bison parser, made by GNU Bison 3.7.4.  */
 
 /* Bison interface for Yacc-like parsers in C
 
@@ -53,16 +53,15 @@
 extern int tlua_yydebug;
 #endif
 /* "%code requires" blocks.  */
-#line 1 "src/parser.y"
+#line 2 "src/parser.y"
 
-#include <stdio.h>
-#include <lua.h>
+#include <tlua/config.h>
 #include <tlua/alloc.h>
 #include <tlua/region.h>
 #include <tlua/ast.h>
 #include <tlua/lexer.h>
 
-#line 66 "_build/parser.h"
+#line 65 "_build/parser.h"
 
 /* Token kinds.  */
 #ifndef TLUA_YYTOKENTYPE
@@ -150,12 +149,12 @@ extern int tlua_yydebug;
 #if ! defined TLUA_YYSTYPE && ! defined TLUA_YYSTYPE_IS_DECLARED
 union TLUA_YYSTYPE
 {
-#line 67 "src/parser.y"
+#line 40 "src/parser.y"
 
     /* Terminals */
     lua_Number real;
     lua_Unsigned word;
-    struct {
+    struct tlua_int_token {
         lua_Integer val;
         unsigned int isdigit : 1;
         unsigned int isfield : 1;
@@ -165,13 +164,39 @@ union TLUA_YYSTYPE
     char *ident;
 
     /* Nonterminals */
+    int digit;
     tlua_exp *exp;
     tlua_const *const_;
+    tlua_con *con;
     tlua_var *var;
-    tlua_list *list;
     tlua_field *field;
+    tlua_match *match;
+    tlua_record_item *record_item;
+    tlua_rule *rule;
+    tlua_pat *pat;
+    struct tlua_pat_record pat_record;
+    tlua_type *type;
+    tlua_dec *dec;
+    tlua_fixity fixity;
+    tlua_eb *eb;
+    tlua_typbind *typbind;
+    struct tlua_exp_val val;
+    tlua_funbind *funbind;
 
-#line 175 "_build/parser.h"
+    list(con) *con_list;
+    list(dec) *dec_list;
+    list(exp) *exp_list;
+    list(pat) *pat_list;
+    list(record_item) *record;
+    list(var) *var_list;
+    list(type) *type_list;
+    list(funbind) *funbind_list;
+    list(funbinds) *funbinds_list;
+    list(eb) *eb_list;
+    list(rule) *rule_list;
+    list(typbind) *typbind_list;
+
+#line 200 "_build/parser.h"
 
 };
 typedef union TLUA_YYSTYPE TLUA_YYSTYPE;

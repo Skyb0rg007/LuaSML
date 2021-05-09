@@ -1,5 +1,7 @@
 CC = gcc
-CFLAGS = -Iinclude -Isrc -I_build -g -fno-omit-frame-pointer -fsanitize=address
+CFLAGS = -std=c99 -Iinclude -Isrc -I_build
+CFLAGS += -Wall -Wextra -pedantic -Wno-unused-function
+CFLAGS += -g -fno-omit-frame-pointer -fsanitize=address
 LDFLAGS = -g -fno-omit-frame-pointer -fsanitize=address
 LDLIBS = -llua
 LEX = flex
@@ -7,7 +9,7 @@ LFLAGS =
 YACC = bison
 YFLAGS = -Wall -Wdangling-alias --language=C -Wno-precedence -Wno-other
 
-SOURCES = main alloc parser
+SOURCES = main alloc parser ast lexer
 
 main: $(patsubst %,_build/%.o,$(SOURCES))
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
@@ -18,7 +20,7 @@ _build/%.o: src/%.c _build/deps/%.d | _build/deps
 _build/%.o: _build/%.c _build/deps/%.d | _build/deps
 	$(CC) -MT $@ -MMD -MP -MF _build/deps/$*.d $(CFLAGS) -c $< -o $@
 
-_build/%.c: src/%.l | _build
+_build/%.c _build/%.h: src/%.l | _build
 	$(LEX) $(LFLAGS) --header-file=_build/$*.h --outfile=$@ $<
 
 _build/%.c _build/%.h: src/%.y | _build

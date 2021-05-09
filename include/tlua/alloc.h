@@ -1,67 +1,47 @@
 /* vim: set ft=c: */
-/* Simplified obstacks integrated with Lua memory management
- * Note that these macros often duplicate its arguments
+/* All the memory management used throughout the tlua source code.
+ * The `alloc` struct implements:
+ * - stdlib-style malloc/realloc/free
+ * - lua-style malloc/realloc/free
+ * - obstack-style bump allocator
+ *
+ * The stdlib-style functions are used within flex and bison generated code.
+ * The lua-style functions are used whenever a freeable memory buffer is used.
+ * The bump allocator is used for allocating long-lasting memory.
+ * AST nodes are allocated in that manner, and freed all at once at the end of compilation
  */
 #ifndef TLUA_ALLOC_H
 #define TLUA_ALLOC_H
 
-#include <stddef.h>
-#include <stdint.h>
-#include <string.h>
-#include <lua.h>
+#include <tlua/config.h>
 
-struct alloc_chunk {
-    char *limit;
-    struct alloc_chunk *prev;
-    char contents[4];
-};
+typedef struct tlua_alloc tlua_alloc;
 
-struct alloc {
+/* Creation/Destruction */
+TLUA_API void tlua_alloc_init(tlua_alloc *alloc, lua_State *L);
+TLUA_API void tlua_alloc_destroy(tlua_alloc *alloc);
+/* General allocation/deallocation */
+TLUA_API void *tlua_rawalloc(tlua_alloc *alloc, size_t size);
+TLUA_API void *tlua_rawrealloc(tlua_alloc *alloc, void *p, size_t osize, size_t size);
+TLUA_API void tlua_rawfree(tlua_alloc *alloc, void *p, size_t osize);
+/* Helpers which keep track of allocation size */
+TLUA_API void *tlua_malloc(tlua_alloc *alloc, size_t size);
+TLUA_API void *tlua_realloc(tlua_alloc *alloc, void *p, size_t size);
+TLUA_API void tlua_free(tlua_alloc *alloc, void *p);
+/* Block allocation */
+TLUA_API void *tlua_balloc(tlua_alloc *alloc, size_t size);
+TLUA_API void tlua_bfree(tlua_alloc *alloc, void *p);
+/* Helper for error generation */
+TLUA_API void tlua_error(tlua_alloc *alloc, const char *fmt, ...);
+
+struct tlua_alloc {
     lua_Alloc allocfn;
     void *ud;
-    struct alloc_chunk *chunk;
-    char *object_base, *next_free, *chunk_limit;
+    lua_State *L;
+    struct chunk *chunk;
+    char *chunk_limit;
+    char *next_free;
 };
 
-void alloc_init(struct alloc *a, lua_Alloc allocfn, void *ud);
-void alloc_destroy(struct alloc *a);
-
-/* Allocate using Lua's malloc/free */
-#define rawalloc(a, sz)           ((a)->allocfn((a)->ud, NULL, 0, sz))
-#define rawfree(a, p, sz)         ((a)->allocfn((a)->ud, p, sz, 0))
-#define rawrealloc(a, p, osz, sz) ((a)->allocfn((a)->ud, p, osz, sz))
-
-/* The rest of these routines and macros implement a bump allocator */
-void alloc_newchunk(struct alloc *a, size_t sz);
-void *alloc_finish(struct alloc *a);
-void alloc_free(struct alloc *a, void *p);
-
-#define alloc_room(a)                                                         \
-    (size_t)((a)->chunk_limit - (a)->next_free)
-
-#define alloc_make_room(a, sz)                                                \
-    (alloc_room(a) < (sz) ? alloc_newchunk(a, sz) : (void)0)
-
-#define alloc_blank_fast(a, sz)                                               \
-    (void)((a)->next_free += (sz))
-
-#define alloc_blank(a, sz)                                                    \
-    (void)(alloc_make_room(a, sz), (a)->next_free += (sz))
-
-#define alloc_grow(a, p, sz)                                                  \
-    (void)(alloc_make_room(a, sz),                                            \
-            memcpy((a)->next_free, p, sz),                                    \
-            (a)->next_free += (sz))
-
-#define alloc(a, sz)                                                          \
-    (alloc_blank(a, sz), alloc_finish(a))
-
-#define alloc_copy(a, p, sz)                                                  \
-    (alloc_grow(a, p, sz), alloc_finish(a))
-
-#define alloc_free(a, p)                                                      \
-    ((void *)(a)->chunk < (p) && (p) < (void *)(a)->chunk_limit ?             \
-        (a)->next_free = (a)->object_base = (char *)(p) :                     \
-        (alloc_free)(a, p))
-
 #endif
+

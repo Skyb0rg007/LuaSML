@@ -1,63 +1,70 @@
 
-#include <stdio.h>
-#include <lua.h>
-#include <lauxlib.h>
-#include "tlua/alloc.h"
-#include "tlua/region.h"
-#include "tlua/lexer.h"
-#include "../_build/parser.h"
+#include <tlua/config.h>
+#include <tlua/alloc.h>
+#include <tlua/region.h>
+#include <tlua/lexer.h>
+#include <../_build/parser.h>
 
-union TLUA_YYSTYPE lvals[10] = {
-    { .word = 23 },
-    { .chr = 'a' },
-    {0},
-    {0}
-};
-int toks[10] = {
-    T_WORD,
-    T_CHAR,
-    T_ANDALSO,
-    T_EOF
-};
-
-static void lexstate_init(tlua_lexstate *lexstate);
 
 int main(void)
 {
     tlua_lexstate lexstate;
-    lexstate_init(&lexstate);
+    lua_State *L;
+    void *scanner;
 
-    tlua_yyparse(NULL, &lexstate);
+    L = luaL_newstate();
+    tlua_alloc_init(&lexstate.alloc, L);
+    tlua_yylex_init_extra(&lexstate, &scanner);
+    tlua_yyset_in(stdin, scanner);
 
-    alloc_destroy(&lexstate.alloc);
-    lua_close(lexstate.L);
+    tlua_yyparse(scanner, &lexstate);
+
+    tlua_yylex_destroy(scanner);
+    tlua_alloc_destroy(&lexstate.alloc);
+    lua_close(L);
 }
 
-int tlua_yylex(union TLUA_YYSTYPE *lval, struct region *lloc, yyscan_t scanner)
+/* 
+union TLUA_YYSTYPE lvals[] = {
+    {0},
+    { .ident = "foo" },
+    {0},
+    { .word = 23 },
+    { .ident = "+" },
+    { .word = 45 },
+    { .ident = "-" },
+    { .word = 23 },
+    {0},
+    {0},
+    {0},
+    {0}
+};
+int toks[] = {
+    // { foo = 0w23 + 0w45, * }
+    T_LBRACE,
+    T_SHORTALPHANUMID,
+    T_EQUALOP,
+    T_WORD,
+    T_SHORTSYMID,
+    T_WORD,
+    T_SHORTSYMID,
+    T_WORD,
+    T_COMMA,
+    T_ASTERISK,
+    T_RBRACE,
+    T_EOF
+};
+int tlua_yylex(union TLUA_YYSTYPE *lval, struct region *lloc, void *scanner)
 {
     static int i = 0;
+    UNUSED(scanner);
 
     lloc->left.line = lloc->left.column = lloc->right.line = lloc->right.column = i;
 
     *lval = lvals[i];
     return toks[i++];
 }
-
-static void lexstate_init(tlua_lexstate *lexstate)
-{
-    void *ud;
-    lua_Alloc allocfn;
-    lua_State *L;
-
-    L = luaL_newstate();
-    allocfn = lua_getallocf(L, &ud);
-
-    lexstate->L = L;
-    memset(&lexstate->text, 0, sizeof lexstate->text);
-    alloc_init(&lexstate->alloc, allocfn, ud);
-    memset(&lexstate->saved_left, 0, sizeof lexstate->saved_left);
-}
-
+ */
 /* 
 static void print_tok(int tok, const tlua_token_value *lval);
 

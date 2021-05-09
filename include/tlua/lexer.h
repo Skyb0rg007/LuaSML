@@ -2,21 +2,27 @@
 #ifndef TLUA_LEXER_H
 #define TLUA_LEXER_H 
 
-#include <stdio.h>
-#include <lua.h>
-#include "tlua/alloc.h"
-#include "tlua/region.h"
+#include <tlua/config.h>
+#include <tlua/alloc.h>
+#include <tlua/region.h>
 
 typedef struct {
-    lua_State *L;
     struct {
         char *buf;
         int len, size;
     } text;
-    struct alloc alloc;
+    tlua_alloc alloc;
     struct sourcepos saved_left; /* Saved text/comment position */
 } tlua_lexstate;
 
+union TLUA_YYSTYPE;
+
+int tlua_yylex_init_extra(tlua_lexstate *lexstate, void **scanner);
+int tlua_yylex_destroy(void *scanner);
+void tlua_yyset_in(FILE *fp, void *scanner);
+int tlua_yylex(union TLUA_YYSTYPE *lval, struct region *lloc, void *scanner);
+
+#if 0
 #define YY_TYPEDEF_YY_SCANNER_T
 typedef void *yyscan_t;
 
@@ -27,9 +33,6 @@ int tlua_yylex_destroy(yyscan_t scanner);
 void tlua_yyset_in(FILE *fp, yyscan_t scanner);
 int tlua_yylex(union TLUA_YYSTYPE *lval, struct region *lloc, yyscan_t scanner);
 
-
-// TODO: Remove with Bison
-#ifdef LEXER
 typedef enum {
     T_EOF = 0,
     /* Symbols */

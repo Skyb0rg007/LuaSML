@@ -6,13 +6,13 @@
 #endif
 }
 %{
-#include <stdbool.h>
-#include <stdio.h>
-#include "tlua/alloc.h"
-#include "tlua/lexer.h"
+#include <tlua/config.h>
+#include <tlua/alloc.h>
+#include <tlua/lexer.h>
+#include <parser.h>
 
-#define YYSTYPE tlua_token_value
-#define YYLTYPE struct region
+#define YYSTYPE TLUA_YYSTYPE
+#define YYLTYPE TLUA_YYLTYPE
 
 #define YY_USER_ACTION                           \
     yycolumn += yyleng;                          \
@@ -30,7 +30,8 @@
     yylloc->right.column = yycolumn = 0; \
 } while(0)
 
-#define memdup(p, n) alloc_copy(&yyextra->alloc, p, n)
+#define memdup(p, n) memdup(&yyextra->alloc, p, n)
+static void *(memdup)(tlua_alloc *alloc, const void *p, size_t n);
 #define errorl(str) error(yyextra, &yylloc->left, &yylloc->right, str)
 #define errort(str) error(yyextra, &yyextra->saved_left, &yylloc->right, str)
 static void error(tlua_lexstate *, const struct sourcepos *l, const struct sourcepos *r, const char *);
@@ -186,7 +187,7 @@ real     "~"?(({decnum}{frac}?{exp})|({decnum}{frac}{exp}?))
 }
 
 <STRING>"\"" {
-    yylval->string.buf = alloc_copy(&yyextra->alloc, yyextra->text.buf, yyextra->text.len);
+    yylval->string.buf = memdup(yyextra->text.buf, yyextra->text.len);
     yylval->string.len = yyextra->text.len;
     free(yyextra->text.buf);
     yy_pop_state(yyscanner);
@@ -387,6 +388,9 @@ static void error(
     const struct sourcepos *right,
     const char *str)
 {
+    UNUSED(lexstate);
+    UNUSED(left);
+    UNUSED(right);
     /* TODO: Error handling */
     fprintf(stderr, "Error: %s\n", str);
     /* int written; */
@@ -407,28 +411,24 @@ static void error(
 
 void *yyalloc(size_t sz, yyscan_t scanner)
 {
-    struct alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
-    size_t *mem = rawalloc(alloc, sz + sizeof(size_t));
-    *mem = sz + sizeof(size_t);
-    return mem + 1;
+    tlua_alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
+    return tlua_malloc(alloc, sz);
 }
 void *yyrealloc(void *p, size_t sz, yyscan_t scanner)
 {
-    struct alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
-    size_t *mem = p;
-    mem = mem - 1;
-    mem = rawrealloc(alloc, mem, *mem, sz + sizeof(size_t));
-    *mem = sz + sizeof(size_t);
-    return mem + 1;
+    tlua_alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
+    return tlua_realloc(alloc, p, sz);
 }
 void yyfree(void *p, yyscan_t scanner)
 {
-    if (p) {
-        struct alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
-        size_t *mem = p;
-        mem = mem - 1;
-        rawfree(alloc, mem, *mem);
-    }
+    tlua_alloc *alloc = &((struct yyguts_t *)scanner)->yyextra_r->alloc;
+    tlua_free(alloc, p);
 }
 
+static void *(memdup)(tlua_alloc *alloc, const void *p, size_t n)
+{
+    void *q = tlua_balloc(alloc, n);
+    memcpy(q, p, n);
+    return q;
+}
 
