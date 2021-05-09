@@ -7,7 +7,7 @@ LDLIBS = -llua
 LEX = flex
 LFLAGS =
 YACC = bison
-YFLAGS = -Wall -Wdangling-alias --language=C -Wno-precedence -Wno-other
+YFLAGS = -Wall -Wdangling-alias --language=C -Wno-precedence -Wno-other -Wcounterexamples
 
 SOURCES = main alloc parser ast lexer
 

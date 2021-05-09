@@ -48,6 +48,8 @@ define_list(funbind, tlua_funbind *);
 define_list(funbinds, list(funbind) *);
 define_list(eb, tlua_eb *);
 define_list(con, tlua_con *);
+define_list(valbind, tlua_valbind *);
+define_list(rvalbind, tlua_rvalbind *);
 
 /*** Atoms ***/
 
@@ -107,10 +109,11 @@ struct tlua_datbind {
 struct tlua_datatype {
     list(var) *tyvars;
     tlua_var *tycon;
-    list(var) *cons;
+    list(con) *cons;
 };
 
 struct tlua_datatype_rhs {
+    struct region loc;
     enum { DATATYPE_RHS_DATBIND, DATATYPE_RHS_REPL } tag;
     union {
         tlua_datbind *datbind;
@@ -276,6 +279,8 @@ struct tlua_dec {
         DEC_VAL
     } tag;
     union {
+        tlua_datatype_rhs *datatype;
+        list(typbind) *type;
         tlua_exp *do_;
         list(eb) *exception;
         struct {
@@ -394,6 +399,12 @@ TLUA_API void tlua_print_pat(const tlua_pat *, FILE *);
     (p)->loc = (_loc);                                 \
 } while (0)
 
+#define tlua_datatype_rhs(p, _tag, _loc) do {                \
+    (p) = tlua_balloc(allocator, sizeof(tlua_datatype_rhs)); \
+    (p)->tag = DATATYPE_RHS_##_tag;                          \
+    (p)->loc = (_loc);                                       \
+} while (0)
+
 #define tlua_record_item(p, _loc) do {                 \
     (p) = tlua_balloc(allocator, sizeof(tlua_pat));    \
     (p)->loc = (_loc);                                 \
@@ -414,6 +425,22 @@ TLUA_API void tlua_print_pat(const tlua_pat *, FILE *);
 
 #define tlua_funbind(p) do {                               \
     (p) = tlua_balloc(allocator, sizeof(tlua_funbind));    \
+} while (0)
+
+#define tlua_valbind(p) do {                               \
+    (p) = tlua_balloc(allocator, sizeof(tlua_valbind));    \
+} while (0)
+
+#define tlua_rvalbind(p) do {                               \
+    (p) = tlua_balloc(allocator, sizeof(tlua_rvalbind));    \
+} while (0)
+
+#define tlua_datbind(p) do {                               \
+    (p) = tlua_balloc(allocator, sizeof(tlua_datbind));    \
+} while (0)
+
+#define tlua_datatype(p) do {                               \
+    (p) = tlua_balloc(allocator, sizeof(tlua_datatype));    \
 } while (0)
 
 #endif

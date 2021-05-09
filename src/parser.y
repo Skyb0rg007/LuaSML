@@ -69,6 +69,8 @@ static void tlua_yyerror(struct region *, void *scanner, tlua_lexstate *, const 
     tlua_typbind *typbind;
     struct tlua_exp_val val;
     tlua_funbind *funbind;
+    tlua_datatype_rhs *datatype_rhs;
+    tlua_datatype *datatype;
 
     list(con) *con_list;
     list(dec) *dec_list;
@@ -82,6 +84,8 @@ static void tlua_yyerror(struct region *, void *scanner, tlua_lexstate *, const 
     list(eb) *eb_list;
     list(rule) *rule_list;
     list(typbind) *typbind_list;
+    list(rvalbind) *rvalbind_list;
+    list(datatype) *datatype_list;
 }
 %parse-param { void *scanner } { tlua_lexstate *lexstate }
 %lex-param { void *scanner }
@@ -100,7 +104,11 @@ static void tlua_yyerror(struct region *, void *scanner, tlua_lexstate *, const 
 %token <string> STRING
 %token <chr> CHAR
 
-%nterm <val> valbind_top
+%nterm <datatype> db
+%nterm <datatype_list> dbs
+%nterm <datatype_rhs> repl datbind datatype_rhs
+%nterm <val> valbind
+%nterm <rvalbind_list> rvalbind
 %nterm <type> constraint
 %nterm <funbind> clause
 %nterm <funbind_list> clauses clauses_top
@@ -156,18 +164,6 @@ input: %empty
 
 /*** Declarations ***/
 
-fixity : INFIX        { $$.tag = FIXITY_INFIX;  $$.precedence = -1; }
-       | INFIX digit  { $$.tag = FIXITY_INFIX;  $$.precedence = $2; }
-       | INFIXR       { $$.tag = FIXITY_INFIXR; $$.precedence = -1; }
-       | INFIXR digit { $$.tag = FIXITY_INFIXR; $$.precedence = $2; }
-       | NONFIX       { $$.tag = FIXITY_NONFIX; $$.precedence = -1; }
-
-digit : INT {
-        $$ = $1.val;
-        if (!$1.isdigit)
-            fprintf(stderr, "Not a digit!\n");
-      }
-
 decs : %empty { $$ = NULL; }
      | dec decs { list_cons($$, $1, $2); }
      | SEMICOLON decs { $$ = $2; }
@@ -175,14 +171,52 @@ decs : %empty { $$ = NULL; }
 dec : decnolocal { $$ = $1; }
     | LOCAL decs IN decs END { tlua_dec($$, LOCAL, @$); $$->val.local.d1 = $2; $$->val.local.d2 = $4; }
 
-decnolocal : VAL valbind_top { tlua_dec($$, VAL, @$); $$->val.val = $2; }
-           | VAL tyvarseq valbind_top { tlua_dec($$, VAL, @$); $$->val.val = $3; $$->val.val.tyvars = $2; }
-           | DO exp { tlua_dec($$, DO, @$); $$->val.do_ = $2; }
-           | FUN funs { tlua_dec($$, FUN, @$); $$->val.fun.tyvars = NULL; $$->val.fun.fbs = $2; }
-           | FUN tyvarseq funs { tlua_dec($$, FUN, @$); $$->val.fun.tyvars = $2; $$->val.fun.fbs = $3; }
-           | EXCEPTION ebs { tlua_dec($$, EXCEPTION, @$); $$->val.exception = $2; }
-           | OPEN longstrids { tlua_dec($$, OPEN, @$); $$->val.open = $2; }
-           | fixity vids { tlua_dec($$, FIX, @$); $$->val.fixity.fixity = $1; $$->val.fixity.ops = $2; }
+decnolocal : VAL valbind           { tlua_dec($$, VAL, @$); $$->val.val = $2; $$->val.val.tyvars = NULL; }
+           | VAL tyvarseq valbind  { tlua_dec($$, VAL, @$); $$->val.val = $3; $$->val.val.tyvars = $2; }
+           | DO exp                { tlua_dec($$, DO, @$); $$->val.do_ = $2; }
+           | FUN funs              { tlua_dec($$, FUN, @$); $$->val.fun.tyvars = NULL; $$->val.fun.fbs = $2; }
+           | FUN tyvarseq funs     { tlua_dec($$, FUN, @$); $$->val.fun.tyvars = $2; $$->val.fun.fbs = $3; }
+           | TYPE tbs              { tlua_dec($$, TYPE, @$); $$->val.type = $2; }
+           | DATATYPE datatype_rhs { tlua_dec($$, DATATYPE, @$); $$->val.datatype = $2; }
+           | EXCEPTION ebs         { tlua_dec($$, EXCEPTION, @$); $$->val.exception = $2; }
+           | OPEN longstrids       { tlua_dec($$, OPEN, @$); $$->val.open = $2; }
+           | fixity vids           { tlua_dec($$, FIX, @$); $$->val.fixity.fixity = $1; $$->val.fixity.ops = $2; }
+
+valbind : pat EQUALOP exp {
+            tlua_valbind *vb;
+            tlua_valbind(vb);
+            vb->pat = $1; vb->exp = $3;
+            list_cons($$.vbs, vb, NULL);
+            $$.rvbs = NULL;
+        }
+        | pat EQUALOP exp AND valbind {
+            tlua_valbind *vb;
+            tlua_valbind(vb);
+            vb->pat = $1; vb->exp = $3;
+            list_cons($$.vbs, vb, $5.vbs);
+            $$.rvbs = $5.rvbs;
+        }
+        | REC rvalbind {
+            $$.vbs = NULL;
+            $$.rvbs = $2;
+        }
+
+rvalbind : REC rvalbind { $$ = $2; }
+         | pat EQUALOP FN match {
+            tlua_rvalbind *rvb;
+            tlua_rvalbind(rvb);
+            rvb->pat = $1; rvb->match = $4;
+            list_cons($$, rvb, NULL);
+         }
+         | pat EQUALOP FN match AND rvalbind {
+            tlua_rvalbind *rvb;
+            tlua_rvalbind(rvb);
+            rvb->pat = $1; rvb->match = $4;
+            list_cons($$, rvb, $6);
+         }
+
+constraint : %empty { $$ = NULL; }
+           | COLON ty { $$ = $2; }
 
 funs : clauses_top { list_cons($$, $1, NULL); }
      | clauses_top AND funs { list_cons($$, $1, $3); }
@@ -227,6 +261,18 @@ ebrhs : %empty { tlua_eb($$, GEN); $$->val.gen = NULL; }
       | EQUALOP longcon { tlua_eb($$, DEF); $$->val.def = $2; }
       | EQUALOP OP longcon { tlua_eb($$, DEF); $$->val.def = $3; }
 
+fixity : INFIX        { $$.tag = FIXITY_INFIX;  $$.precedence = -1; }
+       | INFIX digit  { $$.tag = FIXITY_INFIX;  $$.precedence = $2; }
+       | INFIXR       { $$.tag = FIXITY_INFIXR; $$.precedence = -1; }
+       | INFIXR digit { $$.tag = FIXITY_INFIXR; $$.precedence = $2; }
+       | NONFIX       { $$.tag = FIXITY_NONFIX; $$.precedence = -1; }
+
+digit : INT {
+        $$ = $1.val;
+        if (!$1.isdigit)
+            fprintf(stderr, "Not a digit!\n");
+      }
+
 numericField : INT {
     tlua_field($$, NUM);
     if (!$1.isfield)
@@ -234,10 +280,40 @@ numericField : INT {
     $$->val.num = (unsigned)$1.val;
 }
 
-match : %empty { $$ = NULL; }
+datatype_rhs : repl { $$ = $1; }
+             | datbind { $$ = $1; }
 
-constraint : %empty { $$ = NULL; }
-           | COLON ty { $$ = $2; }
+repl : tyvars tycon EQUALOP DATATYPE longtycon {
+         if ($1) {
+            fprintf(stderr, "Nonempty tyvars in datatype repl\n");
+         }
+         tlua_datatype_rhs($$, REPL, @$);
+         $$->val.repl.lhs = $2;
+         $$->val.repl.rhs = $5;
+     }
+
+datbind : dbs {
+            tlua_datatype_rhs($$, DATBIND, @$);
+            tlua_datbind($$->val.datbind);
+            $$->val.datbind->datatypes = $1;
+            $$->val.datbind->withtypes = NULL;
+        }
+        | dbs withtypes {
+            tlua_datatype_rhs($$, DATBIND, @$);
+            tlua_datbind($$->val.datbind);
+            $$->val.datbind->datatypes = $1;
+            $$->val.datbind->withtypes = $2;
+        }
+
+dbs : db { list_cons($$, $1, NULL); }
+    | db AND dbs { list_cons($$, $1, $3); }
+
+db : tyvars tycon EQUALOP optbar constrs {
+       tlua_datatype($$);
+       $$->tyvars = $1;
+       $$->tycon = $2;
+       $$->cons = $5;
+   }
 
 withtypes : WITHTYPE tbs { $$ = $2; }
 

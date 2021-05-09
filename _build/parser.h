@@ -182,6 +182,8 @@ union TLUA_YYSTYPE
     tlua_typbind *typbind;
     struct tlua_exp_val val;
     tlua_funbind *funbind;
+    tlua_datatype_rhs *datatype_rhs;
+    tlua_datatype *datatype;
 
     list(con) *con_list;
     list(dec) *dec_list;
@@ -195,8 +197,10 @@ union TLUA_YYSTYPE
     list(eb) *eb_list;
     list(rule) *rule_list;
     list(typbind) *typbind_list;
+    list(rvalbind) *rvalbind_list;
+    list(datatype) *datatype_list;
 
-#line 200 "_build/parser.h"
+#line 204 "_build/parser.h"
 
 };
 typedef union TLUA_YYSTYPE TLUA_YYSTYPE;
